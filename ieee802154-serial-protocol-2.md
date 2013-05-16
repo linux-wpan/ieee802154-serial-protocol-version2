@@ -1,0 +1,280 @@
+IEEE 802.15.4 serial protocol version 2
+=======================================
+
+Foreword
+--------
+
+*This document describes an update to the [IEEE 802.15.4  serial protocol
+version 1][serial-v1]. It is a work in progress and will be subject to frequent
+changes.*
+
+This serial protocol is designed to be a common protocol for any IEEE 802.15.4
+device which uses a serial interface. Typically these devices are programmable
+with user-firmware, and this protocol is implemented in the firmware. Devices
+using the serial interface use the (currently unofficial) driver named
+["serial"][serial-driver] and must be attached to a wpan device using
+[izattach][linux-wpan-userpace-tool].  The serial driver is not in the mainline
+kernel but is easily ported. If you are interested in using the serial driver
+with the mainline kernel, please contact the mailing list.
+
+No device currently fully implement this protocol. Once this specification is
+more stable, plans are to add support to the [Redwire Econotag][econotag] and to
+the [virtual IEEE 802.15.4 device][virtual-ieee802154] project.
+
+Motivation
+----------
+
+The [serial protocol version 1][serial-v1] was designed several years ago with the RedBee
+Econotag in mind. At that time most of its hardware functionalities were not
+implemented in the firmware (e.g. hardware auto-ACK). 
+Also, some commands defined in the specification are not needed (e.g. *set state*) and/or
+won't ever need to be implemented (e.g. *clear channel assessment*).
+I believe now is time, before the serial driver is merged in the Linux kernel,
+to think about improving the protocol so as to better match the current devices capabilities.
+
+Overview of the protocol
+------------------------
+
+Host and serial dongle exchange messages. Each message starts with sequence of
+two bytes ('s' = 0x73, '2' = 0x32), for Serial version 2. This is later
+referred as the *starting bytes*. After which comes command/response ID (named
+"cmdID" thereafter).  Messages coming from the host have highest bit in cmdID
+clear, messages coming from the dongle have high bit set.
+All the command are acknowledged by a corresponding response (whose cmdID is
+the same, except for the highest bit set).  The response indicate the status of
+the command (SUCCESS or FAILURE). A failure (FAILURE) is followed by an error
+code, that indicate the reason of the failure.
+
+This protocol specifies mandatory commands that MUST be implemented.
+It also defines optional commands (such as enabling hardware
+auto-acknowledgment), that MAY be implemented, depending on the device
+capabilities.
+
+Constant values
+---------------
+
+### Status
+
+* SUCCESS (0x00): the command succeeded
+* FAILURE (0x01): the command failed, and error code providing more details follow
+
+### Error codes
+
+* BUSY_RX (TBA): device is busy receiving a packet
+* BUSY_TX (TBA): device is busy transmitting a packet
+* BUSY_UNSPEC (TBA): device is busy (reason not specified)
+* NOT_IMPLEMENTED (TBA): command is not implemented
+* UNKNOWN_ERR (TBA): error unknown
+
+
+Mandatory commands
+------------------
+
+### No-op
+
+This command is sent by the host to the dongle and does nothing. It always
+succeeds. This is a way to check the hardware readiness and/or aliveness.
+It can be help determining at which baudrate the device runs. Here, lack of
+response can indicate that the command was not interpretable by the device.
+
+<table border=1>
+<tr><td>Type (entity)</td><td>Bytes sent</td></tr>
+<tr><td>Command (host)</td><td>'s' '2' 0x00</td> </tr>
+<tr><td>Response (dongle)</td><td>'s' '2' 0x80 SUCCESS</td> </tr>
+</table>
+
+### Open
+
+Power up transceiver, initialize the hardware for receiving packet.
+
+<table border=1>
+<tr><td>Type (entity)</td><td>Bytes sent</td></tr>
+<tr><td>Command (host)</td><td>'s' '2' 0x01</td> </tr>
+<tr><td>Response (dongle)</td><td>'s' '2' 0x81 &lt;status&gt; [error_code]</td> </tr>
+</table>
+
+When *status* is FAILURE, the error_code is also returned.
+
+### Close
+
+Power down tranceiver, shut down current operations, etc.
+
+<table border=1>
+<tr><td>Type (entity)</td><td>Bytes sent</td></tr>
+<tr><td>Command (host)</td><td>'s' '2' 0x02</td> </tr>
+<tr><td>Response (dongle)</td><td>'s' '2' 0x82 &lt;status&gt; [error_code]</td> </tr>
+</table>
+
+When *status* is FAILURE, the error_code is also returned.
+
+### Energy Detection (ED)
+
+Start ED measurement. When it succeeds, it returns a level value in a unit that is TBD.
+
+<table border=1>
+<tr><td>Type (entity)</td><td>Bytes sent</td></tr>
+<tr><td>Command (host)</td><td>'s' '2' 0x03</td> </tr>
+<tr><td>Response (dongle)</td><td>'s' '2' 0x83 &lt;status&gt; [level/error_code]</td> </tr>
+</table>
+
+When *status* is SUCCESS, an Energy Detection *level* for the current channel is returned.
+When *status* is FAILURE, the error_code is returned.
+
+### Transmit Block
+
+
+Transmit a block of data. *len* is the length of the data block (it MUST not
+exceed 125 bytes). *data* SHOULD contain a valid IEEE 802.15.4 frame (without
+the FCS field, that is calculated by the dongle).
+
+<table border=1>
+<tr><td>Type (entity)</td><td>Bytes sent</td></tr>
+<tr><td>Command (host)</td><td>'s' '2' 0x04 &lt;len&gt; &lt;data * len&gt;</td> </tr>
+<tr><td>Response (dongle)</td><td>'s' '2' 0x84 &lt;status&gt; [level/error_code]</td> </tr>
+</table>
+
+When *status* is FAILURE, the error_code is also returned.
+
+### Receive Block
+
+The only message that is initiated by the dongle. Indicates received block.
+*lqi* is LQI measured during reception, <len> is the length of <data> block.
+<data> is the MAC frame without the FCS field. *lqi* values ranging from 0 to
+127 (included) indicate a normalized LQI. *lqi* value 255 indicates that no LQI
+is (temporary or not) available. Other *lqi* MUST not be used.
+
+<table border=1>
+<tr><td>Type (entity)</td><td>Bytes sent</td></tr>
+<tr><td>Command (dongle)</td><td>'s' '2' 0x05 &lt;lqi&gt; &lt;len&gt; &lt;data * len&gt;</td> </tr>
+<tr><td>Response (host)</td><td>'s' '2' 0x85 &lt;status&gt; [error_code]</td> </tr>
+</table>
+
+When *status* is FAILURE, the error_code is also returned to the dongle.
+
+### Get 64-bit (long) address
+
+Request a 64-bit (long) address from the dongle.
+
+<table border=1>
+<tr><td>Type (entity)</td><td>Bytes sent</td></tr>
+<tr><td>Command (host)</td><td>'s' '2' 0x06</td> </tr>
+<tr><td>Response (dongle)</td><td>'s' '2' 0x86 &lt;status&gt; [address * 8 bytes]</td> </tr>
+</table>
+
+When *status* is SUCCESS, *address* (8 bytes) is returned and contains the
+64-bit hardware address. The first byte on the wire contains the Least
+Significant Bytes (LSB) of the address. When *status* is FAILURE, the
+error_code is returned.
+
+Optional commands
+-----------------
+
+### Set 64-bit (long) address
+
+TBA
+
+### Set 16-bit (short) address
+
+TBA
+
+### Set PAN Identifier
+
+TBA
+
+Handling non-implemented commands
+---------------------------------
+
+The device must respond to unknown commands with the following sequence *'s'
+'2' &lt;response-id&gt; FAILURE NOT_IMPLEMENTED* (thus indicating that the
+command is not supported). The response-id value is the unsupported cmdID of
+the command (i.e. the request) whose higher bit has been set.
+
+Default behavior at boot time
+-----------------------------
+
+Once the *open* command has been executed successfully, the device should be in
+the following states:
+
+* the non-beacon enabled mode and does not track any beacon
+* no hardware function is started (no accelerate crypto module is initialized, no auto-ACK, etc.)
+
+The following values explicitly do not need to be reset between power cycles:
+
+* 64 bit (long) address
+
+Miscellaneous
+-------------
+
+* a reset of the hardware requires calling the *close* and the *open* command
+  in that order. This is the current behavior of the serial driver.
+
+
+Contact
+-------
+
+This document is currently a draft of what the version 2 of the serial protocol
+should be and need external contribution and reviews to be improved. You
+welcomed to discuss the protocol on the [linux-zigbee-ml] or send me an email
+(tony.cheneau@amnesiak.org).
+
+Appendices
+==========
+
+Current implementation status
+-----------------------------
+
+### Linux driver
+
+TBA
+
+### Redbee Econotag firmware
+
+TBA
+
+### Virtual IEEE 802.15.4 device
+
+TBA
+
+Differences between the serial protocol version 1 and version 2
+---------------------------------------------------------------
+
+### First bytes have been changed from "zb" to "s2"
+
+The starting bytes are now "s2" instead of "zb".
+
+**Rational**:
+* better reflect that the implementation is not connected to any ZigBee related effort
+* prevent implementation of [Serial Protocol version 1][serial-v1] from working with a device implementing this document
+* the "2" part can be change to a later value if the protocol even needs to be implemented
+
+
+### Set State command has been removed
+
+**Rational**: a device can enable the TX mode automatically when transmitting data.
+
+### Clear Channel Assessment (CCA) command has been removed
+
+**Rational**: this function is implemented on the device side. Furthermore, it
+is not possible to execute this command on a serial like in a timely manner.
+
+### A new NO-OP command has been introduced
+
+**Rational**: when debugging a device, it is very convenient for the developer
+to have a little probe tool that cause no changes to the device and still
+inform on the device availability.
+
+### Command values have been reassigned
+
+**Rational**: command values has been freed by removing several obsolete
+commands. It makes sense to try to use contiguous values of the available
+"command" space.
+
+
+<!-- list of references -->
+
+[virtual-ieee802154]: https://github.com/tcheneau/virtual-ieee802154-serial
+[serial-v1]: http://sourceforge.net/apps/trac/linux-zigbee/wiki/SerialV1
+[linux-zigbee-ml]: http://sourceforge.net/apps/trac/linux-zigbee/wiki/MailingList
+[serial-driver]: http://TODO
+[linux-wpan-userpace-tool]: http://sourceforge.net/apps/trac/linux-zigbee/wiki/BuildingUserspaceTools
+[econotag]: http://redwirellc.com/store/node/1
