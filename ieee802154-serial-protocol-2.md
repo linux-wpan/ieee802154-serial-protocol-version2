@@ -63,6 +63,8 @@ Constant values
 * BUSY_RX (TBA): device is busy receiving a packet
 * BUSY_TX (TBA): device is busy transmitting a packet
 * BUSY_UNSPEC (TBA): device is busy (reason not specified)
+* UNSUPPORTED_CHAN (TBA): device does not support requested channel
+* UNSUPPORTED_PAGE (TBA): device does not support requested channel page
 * NOT_IMPLEMENTED (TBA): command is not implemented
 * UNKNOWN_ERR (TBA): error unknown
 
@@ -107,14 +109,31 @@ Power down tranceiver, shut down current operations, etc.
 
 When *status* is FAILURE, the error_code is also returned.
 
+### Set Channel
+
+Change used page and channel. page&#35; ranges from 0 to 31. chan&#35; ranges from 1 to
+26. Typically, a device implementing the IEEE 802.15.4-2006 version of the
+standard in the 2.4GHz band will set page to 0 and choose a channels from 11 to 26.
+
+<table border=1>
+<tr><td>Type (entity)</td><td>Bytes sent</td></tr>
+<tr><td>Command (host)</td><td>'s' '2' 0x03 &lt;page&#35;&gt; &lt;chan&#35&gt;</td> </tr>
+<tr><td>Response (dongle)</td><td>'s' '2' 0x83 &lt;status&gt; [error_code]</td> </tr>
+</table>
+
+When *status* is SUCCESS, the page and channel has been set.
+When *status* is FAILURE, the error_code is also returned.
+When the channel page is unsupported, the device returns an *error_code* of UNSUPPORTED_PAGE.
+When the channel is unsupported, the device returns an *error_code* of UNSUPPORTED_CHAN.
+
 ### Energy Detection (ED)
 
 Start ED measurement. When it succeeds, it returns a level value in a unit that is TBD.
 
 <table border=1>
 <tr><td>Type (entity)</td><td>Bytes sent</td></tr>
-<tr><td>Command (host)</td><td>'s' '2' 0x03</td> </tr>
-<tr><td>Response (dongle)</td><td>'s' '2' 0x83 &lt;status&gt; [level/error_code]</td> </tr>
+<tr><td>Command (host)</td><td>'s' '2' 0x04</td> </tr>
+<tr><td>Response (dongle)</td><td>'s' '2' 0x84 &lt;status&gt; [level/error_code]</td> </tr>
 </table>
 
 When *status* is SUCCESS, an Energy Detection *level* for the current channel is returned.
@@ -129,8 +148,8 @@ the FCS field, that is calculated by the dongle).
 
 <table border=1>
 <tr><td>Type (entity)</td><td>Bytes sent</td></tr>
-<tr><td>Command (host)</td><td>'s' '2' 0x04 &lt;len&gt; &lt;data * len&gt;</td> </tr>
-<tr><td>Response (dongle)</td><td>'s' '2' 0x84 &lt;status&gt; [level/error_code]</td> </tr>
+<tr><td>Command (host)</td><td>'s' '2' 0x05 &lt;len&gt; &lt;data * len&gt;</td> </tr>
+<tr><td>Response (dongle)</td><td>'s' '2' 0x85 &lt;status&gt; [level/error_code]</td> </tr>
 </table>
 
 When *status* is FAILURE, the error_code is also returned.
@@ -145,8 +164,8 @@ is (temporary or not) available. Other *lqi* MUST not be used.
 
 <table border=1>
 <tr><td>Type (entity)</td><td>Bytes sent</td></tr>
-<tr><td>Command (dongle)</td><td>'s' '2' 0x05 &lt;lqi&gt; &lt;len&gt; &lt;data * len&gt;</td> </tr>
-<tr><td>Response (host)</td><td>'s' '2' 0x85 &lt;status&gt; [error_code]</td> </tr>
+<tr><td>Command (dongle)</td><td>'s' '2' 0x06 &lt;lqi&gt; &lt;len&gt; &lt;data * len&gt;</td> </tr>
+<tr><td>Response (host)</td><td>'s' '2' 0x86 &lt;status&gt; [error_code]</td> </tr>
 </table>
 
 When *status* is FAILURE, the error_code is also returned to the dongle.
@@ -157,8 +176,8 @@ Request a 64-bit (long) address from the dongle.
 
 <table border=1>
 <tr><td>Type (entity)</td><td>Bytes sent</td></tr>
-<tr><td>Command (host)</td><td>'s' '2' 0x06</td> </tr>
-<tr><td>Response (dongle)</td><td>'s' '2' 0x86 &lt;status&gt; [address * 8 bytes]</td> </tr>
+<tr><td>Command (host)</td><td>'s' '2' 0x07</td> </tr>
+<tr><td>Response (dongle)</td><td>'s' '2' 0x87 &lt;status&gt; [address * 8 bytes]</td> </tr>
 </table>
 
 When *status* is SUCCESS, *address* (8 bytes) is returned and contains the
@@ -246,6 +265,14 @@ The starting bytes are now "s2" instead of "zb".
 * better reflect that the implementation is not connected to any ZigBee related effort
 * prevent implementation of [Serial Protocol version 1][serial-v1] from working with a device implementing this document
 * the "2" part can be change to a later value if the protocol even needs to be implemented
+
+### Set Channel does not use an offset
+
+**Rational**: The IEEE 802.15.4 standard enables a device to operate on various
+frequency bands (e.g. 2450 MHz, 915 MHz, 868 MHz bands, and maybe more in the
+future).  Previous version of the protocol would use an offset to map channels
+11 to 26 of the 2450 MHz band to values 1 to 16. Such an offset prevent usage
+of device that operates in different bands and thus is not desirable.
 
 
 ### Set State command has been removed
