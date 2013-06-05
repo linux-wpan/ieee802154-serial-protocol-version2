@@ -8,20 +8,19 @@ Foreword
 version 1][serial-v1]. It is a work in progress and will be subject to frequent
 changes.*
 
-This serial protocol is designed to be a common protocol for any IEEE 802.15.4
+This serial protocol is designed to be a common protocol for any [IEEE 802.15.4][IEEE 802.15.4-2006]
 device which uses a serial interface. Typically these devices are programmable
-by the user and the firmware can be updated. The protocol proposes in the
-document must be implemented in both the firmware and the driver. Devices using
-the serial interface use the (currently unofficial) driver named
-["serial"][serial-driver] must be attached to a wpan device using
+by the user and their firmware can be easily changed. The protocol proposes in
+the document must be implemented in both the firmware and the driver. Devices
+using the serial interface use the (currently unofficial) driver named
+["serial"][serial-driver] must be attached to a *wpan* device using
 [izattach][linux-wpan-userpace-tool]. Note that the serial driver is not in the
 mainline kernel but is easily ported to recent kernel. If you are interested in
-using the serial driver with the mainline kernel, please contact the mailing
-list.
+using the serial driver with the mainline kernel, please contact [the mailing list][linux-zigbee-ml].
 
-No device currently fully implement this protocol. Once this specification is
-more stable, plans are to add support to the [Redwire Econotag][econotag] and to
-the [virtual IEEE 802.15.4 device][virtual-ieee802154] project.
+No device currently fully implement this protocol. Once this specification
+becomes stable, plans are to add support to the [Redwire Econotag][econotag]
+and to the [virtual IEEE 802.15.4 device][virtual-ieee802154].
 
 Motivation
 ----------
@@ -98,7 +97,7 @@ Power up transceiver, initialize the hardware for receiving packet.
 <tr><td>Response (dongle)</td><td>'s' '2' 0x81 &lt;status&gt; [error_code]</td> </tr>
 </table>
 
-When *status* is FAILURE, the error_code is also returned.
+When *status* is FAILURE, an error_code is also returned.
 
 ### Close
 
@@ -110,7 +109,7 @@ Power down transceiver, shut down current operations, etc.
 <tr><td>Response (dongle)</td><td>'s' '2' 0x82 &lt;status&gt; [error_code]</td> </tr>
 </table>
 
-When *status* is FAILURE, the error_code is also returned.
+When *status* is FAILURE, an error_code is also returned.
 
 ### Set Channel
 
@@ -154,7 +153,7 @@ the FCS field, that is calculated by the dongle).
 <tr><td>Response (dongle)</td><td>'s' '2' 0x85 &lt;status&gt; [level/error_code]</td> </tr>
 </table>
 
-When *status* is FAILURE, the error_code is also returned.
+When *status* is FAILURE, an error_code is also returned.
 
 ### Receive Block
 
@@ -256,7 +255,11 @@ TBA
 
 ### Virtual IEEE 802.15.4 device
 
-TBA
+The [Virtual IEEE 802.15.4 device ][virtual-ieee802154] offers a software
+solution to test 6LoWPAN/IEEE 802.15.4 code over non IEEE 802.15.4 links or
+locally.
+
+TBA.
 
 Differences between the serial protocol version 1 and version 2
 ---------------------------------------------------------------
@@ -309,3 +312,4 @@ commands. It makes sense to try to use contiguous values of the available
 [serial-driver]: http://TODO
 [linux-wpan-userpace-tool]: http://sourceforge.net/apps/trac/linux-zigbee/wiki/BuildingUserspaceTools
 [econotag]: http://redwirellc.com/store/node/1
+[IEEE 802.15.4-2006]: http://standards.ieee.org/findstds/standard/802.15.4-2006.html
