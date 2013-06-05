@@ -10,12 +10,14 @@ changes.*
 
 This serial protocol is designed to be a common protocol for any IEEE 802.15.4
 device which uses a serial interface. Typically these devices are programmable
-with user-firmware, and this protocol is implemented in the firmware. Devices
-using the serial interface use the (currently unofficial) driver named
-["serial"][serial-driver] and must be attached to a wpan device using
-[izattach][linux-wpan-userpace-tool].  The serial driver is not in the mainline
-kernel but is easily ported. If you are interested in using the serial driver
-with the mainline kernel, please contact the mailing list.
+by the user and the firmware can be updated. The protocol proposes in the
+document must be implemented in both the firmware and the driver. Devices using
+the serial interface use the (currently unofficial) driver named
+["serial"][serial-driver] must be attached to a wpan device using
+[izattach][linux-wpan-userpace-tool]. Note that the serial driver is not in the
+mainline kernel but is easily ported to recent kernel. If you are interested in
+using the serial driver with the mainline kernel, please contact the mailing
+list.
 
 No device currently fully implement this protocol. Once this specification is
 more stable, plans are to add support to the [Redwire Econotag][econotag] and to
@@ -28,9 +30,10 @@ The [serial protocol version 1][serial-v1] was designed several years ago with t
 Econotag in mind. At that time most of its hardware functionalities were not
 implemented in the firmware (e.g. hardware auto-ACK). 
 Also, some commands defined in the specification are not needed (e.g. *set state*) and/or
-won't ever need to be implemented (e.g. *clear channel assessment*).
-I believe now is time, before the serial driver is merged in the Linux kernel,
-to think about improving the protocol so as to better match the current devices capabilities.
+will not be implemented in software because of timing requirements (e.g. *clear
+channel assessment*).  I believe now is time, before the serial driver is
+merged in the Linux kernel, to think about improving the protocol so as to
+better match the current devices capabilities.
 
 Overview of the protocol
 ------------------------
@@ -40,8 +43,8 @@ two bytes ('s' = 0x73, '2' = 0x32), for Serial version 2. This is later
 referred as the *starting bytes*. After which comes command/response ID (named
 "cmdID" thereafter).  Messages coming from the host have highest bit in cmdID
 clear, messages coming from the dongle have high bit set.
-All the command are acknowledged by a corresponding response (whose cmdID is
-the same, except for the highest bit set).  The response indicate the status of
+All commands are acknowledged by a corresponding response (whose cmdID is
+the same, except for the highest bit set). The response indicates the status of
 the command (SUCCESS or FAILURE). A failure (FAILURE) is followed by an error
 code, that indicate the reason of the failure.
 
@@ -56,7 +59,7 @@ Constant values
 ### Status
 
 * SUCCESS (0x00): the command succeeded
-* FAILURE (0x01): the command failed, and error code providing more details follow
+* FAILURE (0x01): the command failed, and an error code providing more details follow
 
 ### Error codes
 
@@ -76,7 +79,7 @@ Mandatory commands
 
 This command is sent by the host to the dongle and does nothing. It always
 succeeds. This is a way to check the hardware readiness and/or aliveness.
-It can be help determining at which baudrate the device runs. Here, lack of
+It can help determining at which baudrate the device runs. Here, lack of
 response can indicate that the command was not interpretable by the device.
 
 <table border=1>
@@ -99,7 +102,7 @@ When *status* is FAILURE, the error_code is also returned.
 
 ### Close
 
-Power down tranceiver, shut down current operations, etc.
+Power down transceiver, shut down current operations, etc.
 
 <table border=1>
 <tr><td>Type (entity)</td><td>Bytes sent</td></tr>
@@ -141,7 +144,6 @@ When *status* is FAILURE, the error_code is returned.
 
 ### Transmit Block
 
-
 Transmit a block of data. *len* is the length of the data block (it MUST not
 exceed 125 bytes). *data* SHOULD contain a valid IEEE 802.15.4 frame (without
 the FCS field, that is calculated by the dongle).
@@ -157,7 +159,7 @@ When *status* is FAILURE, the error_code is also returned.
 ### Receive Block
 
 The only message that is initiated by the dongle. Indicates received block.
-*lqi* is LQI measured during reception, <len> is the length of <data> block.
+*lqi* is LQI measured during reception, &lt;len&gt; is the length of &lt;data&gt; block.
 <data> is the MAC frame without the FCS field. *lqi* values ranging from 0 to
 127 (included) indicate a normalized LQI. *lqi* value 255 indicates that no LQI
 is (temporary or not) available. Other *lqi* MUST not be used.
@@ -217,7 +219,9 @@ the following states:
 * the non-beacon enabled mode and does not track any beacon
 * no hardware function is started (no accelerate crypto module is initialized, no auto-ACK, etc.)
 
-The following values explicitly do not need to be reset between power cycles:
+The following values explicitly do not need to be reset between power cycles,
+but does not not to be preserved either, hence their value between reboots is
+undefined:
 
 * 64 bit (long) address
 
