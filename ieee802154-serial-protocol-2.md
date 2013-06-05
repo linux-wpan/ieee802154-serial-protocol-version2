@@ -58,17 +58,29 @@ Constant values
 ### Status
 
 * SUCCESS (0x00): the command succeeded
-* FAILURE (0x01): the command failed, and an error code providing more details follow
+* FAILURE (0x01): the command failed, and an error code providing more details follows
+* SUCCESS_WITH_EXTRA (0x02): the command succeeded, extra information follows
 
 ### Error codes
 
 * BUSY_RX (TBA): device is busy receiving a packet
 * BUSY_TX (TBA): device is busy transmitting a packet
 * BUSY_UNSPEC (TBA): device is busy (reason not specified)
+* TRX_OFF (TBA): transceiver is off
 * UNSUPPORTED_CHAN (TBA): device does not support requested channel
 * UNSUPPORTED_PAGE (TBA): device does not support requested channel page
 * NOT_IMPLEMENTED (TBA): command is not implemented
 * UNKNOWN_ERR (TBA): error unknown
+
+### Modes
+
+* ENABLED (TBA): function is enabled
+* DISABLED (TBA): function is disabled
+
+### Extra information
+
+* NON_PROMISC: device is not in promiscuous mode
+
 
 
 Mandatory commands
@@ -128,19 +140,6 @@ When *status* is FAILURE, the error_code is also returned.
 When the channel page is unsupported, the device returns an *error_code* of UNSUPPORTED_PAGE.
 When the channel is unsupported, the device returns an *error_code* of UNSUPPORTED_CHAN.
 
-### Energy Detection (ED)
-
-Start ED measurement. When it succeeds, it returns a level value in a unit that is TBD.
-
-<table border=1>
-<tr><td>Type (entity)</td><td>Bytes sent</td></tr>
-<tr><td>Command (host)</td><td>'s' '2' 0x04</td> </tr>
-<tr><td>Response (dongle)</td><td>'s' '2' 0x84 &lt;status&gt; [level/error_code]</td> </tr>
-</table>
-
-When *status* is SUCCESS, an Energy Detection *level* for the current channel is returned.
-When *status* is FAILURE, the error_code is returned.
-
 ### Transmit Block
 
 Transmit a block of data. *len* is the length of the data block (it MUST not
@@ -149,8 +148,8 @@ the FCS field, that is calculated by the dongle).
 
 <table border=1>
 <tr><td>Type (entity)</td><td>Bytes sent</td></tr>
-<tr><td>Command (host)</td><td>'s' '2' 0x05 &lt;len&gt; &lt;data * len&gt;</td> </tr>
-<tr><td>Response (dongle)</td><td>'s' '2' 0x85 &lt;status&gt; [level/error_code]</td> </tr>
+<tr><td>Command (host)</td><td>'s' '2' 0x04 &lt;len&gt; &lt;data * len&gt;</td> </tr>
+<tr><td>Response (dongle)</td><td>'s' '2' 0x84 &lt;status&gt; [level/error_code]</td> </tr>
 </table>
 
 When *status* is FAILURE, an error_code is also returned.
@@ -165,11 +164,11 @@ is (temporary or not) available. Other *lqi* MUST not be used.
 
 <table border=1>
 <tr><td>Type (entity)</td><td>Bytes sent</td></tr>
-<tr><td>Command (dongle)</td><td>'s' '2' 0x06 &lt;lqi&gt; &lt;len&gt; &lt;data * len&gt;</td> </tr>
-<tr><td>Response (host)</td><td>'s' '2' 0x86 &lt;status&gt; [error_code]</td> </tr>
+<tr><td>Command (dongle)</td><td>'s' '2' 0x05 &lt;lqi&gt; &lt;len&gt; &lt;data * len&gt;</td> </tr>
+<tr><td>Response (host)</td><td>'s' '2' 0x85 &lt;status&gt; [error_code]</td> </tr>
 </table>
 
-When *status* is FAILURE, the error_code is also returned to the dongle.
+When *status* is FAILURE, an error_code is also returned to the dongle.
 
 ### Get 64-bit (long) address
 
@@ -177,29 +176,117 @@ Request a 64-bit (long) address from the dongle.
 
 <table border=1>
 <tr><td>Type (entity)</td><td>Bytes sent</td></tr>
-<tr><td>Command (host)</td><td>'s' '2' 0x07</td> </tr>
-<tr><td>Response (dongle)</td><td>'s' '2' 0x87 &lt;status&gt; [address * 8 bytes]</td> </tr>
+<tr><td>Command (host)</td><td>'s' '2' 0x06</td> </tr>
+<tr><td>Response (dongle)</td><td>'s' '2' 0x86 &lt;status&gt; [address * 8 bytes]</td> </tr>
 </table>
 
 When *status* is SUCCESS, *address* (8 bytes) is returned and contains the
 64-bit hardware address. The first byte on the wire contains the Least
-Significant Bytes (LSB) of the address. When *status* is FAILURE, the
+Significant Byte (LSB) of the address. When *status* is FAILURE, an
 error_code is returned.
 
 Optional commands
 -----------------
 
+### Energy Detection (ED)
+
+Request an Energy Detection (ED) measurement.  Upon success, it provides an
+estimate of the receiving power within the bandwidth of the channel averaged
+over a period of 8 symbols.  A level value is then returned. Section 6.9.7 of
+the [IEEE 802.15.4-2006] standard provides additional information on how to
+process this value.
+This command can be used with the *set channel* command in order to scan for available channels.
+
+<table border=1>
+<tr><td>Type (entity)</td><td>Bytes sent</td></tr>
+<tr><td>Command (host)</td><td>'s' '2' 0x07</td> </tr>
+<tr><td>Response (dongle)</td><td>'s' '2' 0x87 &lt;status&gt; [level/error_code]</td> </tr>
+</table>
+
+When *status* is SUCCESS, an Energy Detection *level* for the current channel is returned.
+When *status* is FAILURE, an error_code is returned.
+
+Appropriate *error_code* value can be:
+* TRX_OFF: transceiver is off, i.e. the open command need to be executed first
+* BUSY_TX: transceiver is busy sending, another attempt can be made at a later
+  time (this can never happen if the device implements blocking TX)
+
 ### Set 64-bit (long) address
 
-TBA
+Set a 64-bit (long) address to the device. The *address* must be passed with
+the Least Significant Byte first (LSB ordering).
+
+<table border=1>
+<tr><td>Type (entity)</td><td>Bytes sent</td></tr>
+<tr><td>Command (host)</td><td>'s' '2' 0x08 &lt;address * 8 bytes &gt;</td> </tr>
+<tr><td>Response (dongle)</td><td>'s' '2' 0x88 &lt;status&gt; [error_code]</td> </tr>
+</table>
+
+When *status* is FAILURE, an error_code is also returned.
 
 ### Set 16-bit (short) address
 
-TBA
+Set a 16-bit (short) address to the device. The *address* must be passed with
+the most Significant Byte First (LSB ordering).
+
+<table border=1>
+<tr><td>Type (entity)</td><td>Bytes sent</td></tr>
+<tr><td>Command (host)</td><td>'s' '2' 0x09 &lt;address * 2 bytes &gt;</td> </tr>
+<tr><td>Response (dongle)</td><td>'s' '2' 0x89 &lt;status&gt; [error_code]</td> </tr>
+</table>
+
+When *status* is FAILURE, an error_code is also returned.
 
 ### Set PAN Identifier
 
-TBA
+Set a PAN identifier to the device. The *panid* must be passed with the most
+Significant Byte First (LSB ordering).
+
+<table border=1>
+<tr><td>Type (entity)</td><td>Bytes sent</td></tr>
+<tr><td>Command (host)</td><td>'s' '2' 0x0a &lt;panid * 2 bytes &gt;</td> </tr>
+<tr><td>Response (dongle)</td><td>'s' '2' 0x8a &lt;status&gt; [error_code]</td> </tr>
+</table>
+
+When *status* is FAILURE, an error_code is also returned.
+
+### Enable/Disable promiscuous mode
+
+*Depends on*: set 64-bit address, set 16-bit address and set PAN identifier
+
+Enable or disable promiscuous mode in a device. *mode* indicates if the
+promiscuous mode needs to be ENABLED or DISABLED. In promiscuous mode, the
+device will pass any traffic it receives from the transceiver. When this mode
+is disabled, only the packets that destined to the same PAN, and to the short or
+the long address assigned to the device or a broadcast address will be passed to
+the host.
+
+<table border=1>
+<tr><td>Type (entity)</td><td>Bytes sent</td></tr>
+<tr><td>Command (host)</td><td>'s' '2' 0x0b &lt;mode&gt;</td> </tr>
+<tr><td>Response (dongle)</td><td>'s' '2' 0x8b &lt;status&gt; [error_code]</td> </tr>
+</table>
+
+When *status* is FAILURE, an error_code is also returned.
+
+### Enable/Disable hardware auto-acknowledgment
+
+*Depends on*: set 64-bit address, set 16-bit address and set PAN identifier
+
+Enable or disable hardware auto-acknowledgment. *mode* indicates if the
+hardware auto-acknowledgment feature is ENABLED or DISABLED.TBA
+
+
+<table border=1>
+<tr><td>Type (entity)</td><td>Bytes sent</td></tr>
+<tr><td>Command (host)</td><td>'s' '2' 0x0c &lt;mode&gt;</td> </tr>
+<tr><td>Response (dongle)</td><td>'s' '2' 0x8c &lt;status&gt; [extra_info/error_code]</td> </tr>
+</table>
+
+When *status* is FAILURE, an error_code is also returned.  Enabling the
+hardware auto-acknowledgment can disable the promiscuous mode on certain
+devices. When that happens, the device returns *status* SUCCESS_WITH_EXTRA and
+set *extra_info* to NON_PROMISC.
 
 Handling non-implemented commands
 ---------------------------------
@@ -218,11 +305,16 @@ the following states:
 * the non-beacon enabled mode and does not track any beacon
 * no hardware function is started (no accelerate crypto module is initialized, no auto-ACK, etc.)
 
-The following values explicitly do not need to be reset between power cycles,
-but does not not to be preserved either, hence their value between reboots is
-undefined:
+Note that the following aspects are unspecified, thus the following value
+should be set on the device after a power cycle:
 
-* 64 bit (long) address
+* channel
+* 16-bit (short) address of the device
+* 64-bit (long) address of the device
+
+Because it is not known if the device support promiscuous mode, not assumption
+can be made about the default mode of a device upon a power cycle and is
+entirely device dependent.
 
 Miscellaneous
 -------------
@@ -237,7 +329,7 @@ Contact
 This document is currently a draft of what the version 2 of the serial protocol
 should be and need external contribution and reviews to be improved. You
 welcomed to discuss the protocol on the [linux-zigbee-ml] or send me an email
-(tony.cheneau@amnesiak.org).
+(tony.cheneau@amnesiak.org or tony.cheneau@nist.gov).
 
 Appendices
 ==========
@@ -285,6 +377,12 @@ of device that operates in different bands and thus is not desirable.
 ### Set State command has been removed
 
 **Rational**: a device can enable the TX mode automatically when transmitting data.
+
+
+### Energy Detection (ED) is optional
+
+**Rational**: exporting the energy detection feature to the user is not crucial
+for a proper functioning of the devices
 
 ### Clear Channel Assessment (CCA) command has been removed
 
